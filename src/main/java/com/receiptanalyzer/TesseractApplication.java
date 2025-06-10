@@ -1,4 +1,4 @@
-package com.example.tesseract;
+package com.receiptanalyzer;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

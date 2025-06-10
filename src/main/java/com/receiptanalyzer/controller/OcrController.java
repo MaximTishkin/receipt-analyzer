@@ -1,6 +1,7 @@
-package com.example.tesseract.controller;
+package com.receiptanalyzer.controller;
 
-import com.example.tesseract.service.OcrService;
+import com.receiptanalyzer.service.OCRService;
+import com.receiptanalyzer.util.ImageUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,13 +23,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class OcrController {
 
     private static final Logger log = LoggerFactory.getLogger(OcrController.class);
-    private final OcrService ocrService;
+    private final OCRService ocrService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Распознать текст на изображении")
     public String recognizeText(@RequestParam("file") MultipartFile file) {
         try {
-            return ocrService.performOcr(file);
+            return ocrService.processReceipt(ImageUtils.multipartFileToBufferedImage(file));
         } catch (Exception e) {
             log.error("Ошибка при распознавании текста", e);
             throw new RuntimeException("Ошибка при обработке изображения: " + e.getMessage());
