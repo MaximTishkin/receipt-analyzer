@@ -3,7 +3,6 @@ package com.receiptanalyzer.service;
 import com.receiptanalyzer.util.ImageUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.sourceforge.tess4j.Tesseract;
-import net.sourceforge.tess4j.TesseractException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -81,7 +80,7 @@ public class OCRService {
         }
     }
 
-    public String processReceipt(BufferedImage image) throws TesseractException {
+    public String processReceipt(BufferedImage image) {
         try {
             log.info("Starting receipt processing");
             
@@ -101,9 +100,7 @@ public class OCRService {
             log.info("Receipt processing completed successfully. Processed result: {}", processedResult);
             
             return processedResult;
-        } catch (TesseractException e) {
-            log.error("Error during OCR processing: {}", e.getMessage());
-            throw e;
+
         } catch (Exception e) {
             log.error("Unexpected error during receipt processing: {}", e.getMessage());
             throw new RuntimeException("Failed to process receipt", e);
@@ -120,7 +117,7 @@ public class OCRService {
                         .map(String::trim)
                         .filter(line -> !line.isEmpty())
                         .map(this::cleanupLine)
-                        //.filter(this::isValidReceiptLine)
+                        .filter(this::isValidReceiptLine)
                         .reduce((a, b) -> a + "\n" + b)
                         .orElse("");
         } catch (Exception e) {
@@ -144,33 +141,10 @@ public class OCRService {
         }
     }
     
-    private String fixCommonOCRErrors(String line) {
-        try {
-            // Исправляем часто встречающиеся ошибки в суммах
-            line = line.replaceAll("(?<=\\d)О(?=\\d)", "0"); // Замена буквы О на цифру 0
-            line = line.replaceAll("(?<=\\d)l(?=\\d)", "1"); // Замена l на 1
-            line = line.replaceAll("(?<=\\d)З(?=\\d)", "3"); // Замена З на 3
-            
-            // Исправляем пробелы в суммах
-            line = line.replaceAll("(\\d+)\\s+(\\d{2})(?=\\s|$)", "$1.$2"); // 123 45 -> 123.45
-            
-            return line;
-        } catch (Exception e) {
-            log.error("Error during OCR error fixing: {}", e.getMessage());
-            return line;
-        }
-    }
-    
     private boolean isValidReceiptLine(String line) {
         try {
             // Проверяем, содержит ли строка полезную информацию
-            if (line.length() < 3) return false;
-            
-            // Проверяем, содержит ли строка хотя бы одну цифру
-            // но не требуем, чтобы вся строка состояла только из цифр
-            if (!line.matches(".*\\d+.*")) return false;
-            
-            return true;
+            return line.length() >= 3;
         } catch (Exception e) {
             log.error("Error during line validation: {}", e.getMessage());
             return false;

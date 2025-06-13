@@ -18,21 +18,6 @@ public class ImagePreprocessor {
     @Value("${receipt.preprocessing.contrast.limit:1.5}")
     private double contrastLimit;
 
-    @Value("${receipt.preprocessing.enable.denoise:true}")
-    private boolean enableDenoise;
-
-    @Value("${receipt.preprocessing.enable.contrast:true}")
-    private boolean enableContrast;
-
-    @Value("${receipt.preprocessing.enable.binarization:true}")
-    private boolean enableBinarization;
-
-    @Value("${receipt.preprocessing.enable.deskew:true}")
-    private boolean enableDeskew;
-
-    @Value("${receipt.preprocessing.enable.enhance:false}")
-    private boolean enableEnhance;
-
     private final Java2DFrameConverter java2DConverter = new Java2DFrameConverter();
     private final OpenCVFrameConverter.ToMat matConverter = new OpenCVFrameConverter.ToMat();
 
@@ -44,44 +29,34 @@ public class ImagePreprocessor {
             Mat current = gray;
 
             // Применяем билатеральный фильтр для удаления шума с сохранением границ
-            if (enableDenoise) {
-                Mat denoised = new Mat();
-                bilateralFilter(current, denoised, 5, denoiseStrength, denoiseStrength);
-                current = denoised;
-            }
+            Mat denoised = new Mat();
+            bilateralFilter(current, denoised, 5, denoiseStrength, denoiseStrength);
+            current = denoised;
 
             // Улучшаем контраст используя CLAHE
-            if (enableContrast) {
-                Mat clahe = new Mat();
-                CLAHE claheFilter = createCLAHE(contrastLimit, new Size(8, 8));
-                claheFilter.apply(current, clahe);
-                current = clahe;
-            }
+            Mat clahe = new Mat();
+            CLAHE claheFilter = createCLAHE(contrastLimit, new Size(8, 8));
+            claheFilter.apply(current, clahe);
+            current = clahe;
 
             // Применяем адаптивную бинаризацию
-            if (enableBinarization) {
-                Mat binary = new Mat();
-                adaptiveThreshold(
-                        current,
-                        binary,
-                        255,
-                        ADAPTIVE_THRESH_GAUSSIAN_C,
-                        THRESH_BINARY,
-                        11, // Увеличили размер окна для лучшей работы с текстом
-                        10   // Увеличили константу для уменьшения шума
-                );
-                current = binary;
-            }
+            Mat binary = new Mat();
+            adaptiveThreshold(
+                    current,
+                    binary,
+                    255,
+                    ADAPTIVE_THRESH_GAUSSIAN_C,
+                    THRESH_BINARY,
+                    11, // Увеличили размер окна для лучшей работы с текстом
+                    10   // Увеличили константу для уменьшения шума
+            );
+            current = binary;
 
             // Исправляем наклон
-            if (enableDeskew) {
-                current = deskewImage(current);
-            }
+            current = deskewImage(current);
 
             // Дополнительная обработка для чеков
-            if (enableEnhance) {
-                current = enhanceReceipt(current);
-            }
+            current = enhanceReceipt(current);
 
             return matToBufferedImage(current);
         }
