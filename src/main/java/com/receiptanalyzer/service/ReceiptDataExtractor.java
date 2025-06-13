@@ -111,7 +111,28 @@ public class ReceiptDataExtractor {
                 if (foundKeyword != null) {
                     int keywordIndex = line.indexOf(foundKeyword);
                     String afterKeyword = line.substring(keywordIndex + foundKeyword.length());
-                    
+
+                    // Ищем сумму без разделителя (например, 150000)
+                    Pattern sumNoDotPattern = Pattern.compile("\\b(\\d{5,6})(?![.,\\d])");
+                    Matcher noDotMatcher = sumNoDotPattern.matcher(afterKeyword);
+                    if (noDotMatcher.find()) {
+                        String digits = noDotMatcher.group(1);
+                        // Вставляем точку перед последними двумя цифрами
+                        String amountStr = digits.substring(0, digits.length() - 2) + "." + digits.substring(digits.length() - 2);
+                        try {
+                            BigDecimal amount = new BigDecimal(amountStr);
+                            if (isValidAmount(amount)) {
+                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
+                                    maxAmount = amount;
+                                    log.debug("[fix] Found new max amount {} after keyword {} in line: {} (fixed missing dot)", amount, foundKeyword, line);
+                                }
+                            }
+                        } catch (NumberFormatException e) {
+                            log.debug("[fix] Failed to parse fixed amount: {}", amountStr);
+                        }
+                    }
+
+                    // Ищем сумму с разделителем
                     Matcher matcher = AMOUNT_PATTERN.matcher(afterKeyword);
                     while (matcher.find()) {
                         String amountStr = matcher.group(1).replace(",", ".");
