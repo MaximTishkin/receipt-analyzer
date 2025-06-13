@@ -1,5 +1,7 @@
 package com.receiptanalyzer.service;
 
+import com.receiptanalyzer.model.ReceiptInfo;
+import com.receiptanalyzer.model.ReceiptDebugInfo;
 import com.receiptanalyzer.util.ImageUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.sourceforge.tess4j.Tesseract;
@@ -19,7 +21,7 @@ public class OCRService {
     private static final String allowedChars = "0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя.,()-:;/%₽ ";
     private static final Logger log = LoggerFactory.getLogger(OCRService.class);
     private final ImagePreprocessor imagePreprocessor;
-    private final TextCorrectionService textCorrectionService;
+    private final ReceiptDataExtractor dataExtractor;
     private Tesseract tesseract;
     
     @Value("${tesseract.data.path}")
@@ -38,9 +40,9 @@ public class OCRService {
     private Integer confidenceThreshold;
 
     @Autowired
-    public OCRService(ImagePreprocessor imagePreprocessor, TextCorrectionService textCorrectionService) {
+    public OCRService(ImagePreprocessor imagePreprocessor, ReceiptDataExtractor dataExtractor) {
         this.imagePreprocessor = imagePreprocessor;
-        this.textCorrectionService = textCorrectionService;
+        this.dataExtractor = dataExtractor;
     }
 
     @PostConstruct
@@ -82,9 +84,9 @@ public class OCRService {
         }
     }
 
-    public String processReceipt(BufferedImage image) {
+    public ReceiptDebugInfo processReceiptWithDebug(BufferedImage image) {
         try {
-            log.info("Starting receipt processing");
+            log.info("Starting receipt processing with debug info");
             
             // Предварительная обработка изображения
             BufferedImage preprocessedImage = imagePreprocessor.preprocessImage(image);
@@ -94,19 +96,31 @@ public class OCRService {
             ImageUtils.saveImageToFile(preprocessedImage, "preprocessed");
             
             // Выполняем OCR
-            String result = tesseract.doOCR(preprocessedImage);
-            log.debug("OCR processing completed. Raw result: {}", result);
+            String rawText = tesseract.doOCR(preprocessedImage);
+            log.debug("OCR processing completed. Raw result: {}", rawText);
             
-            // Пост-обработка результата
-            String processedResult = postProcessText(result);
-            log.info("Receipt processing completed successfully. Processed result: {}", processedResult);
+            // Очищаем текст
+            String cleanedText = postProcessText(rawText);
+            log.debug("Text cleaned. Result: {}", cleanedText);
             
-            return processedResult;
+            // Извлекаем структурированные данные
+            ReceiptInfo receiptInfo = dataExtractor.extractData(cleanedText);
+            log.info("Receipt data extracted: {}", receiptInfo);
+            
+            return ReceiptDebugInfo.builder()
+                    .receiptInfo(receiptInfo)
+                    .rawText(rawText)
+                    .cleanedText(cleanedText)
+                    .build();
 
         } catch (Exception e) {
             log.error("Unexpected error during receipt processing: {}", e.getMessage());
             throw new RuntimeException("Failed to process receipt", e);
         }
+    }
+
+    public ReceiptInfo processReceipt(BufferedImage image) {
+        return processReceiptWithDebug(image).getReceiptInfo();
     }
 
     private String postProcessText(String text) {
@@ -115,17 +129,13 @@ public class OCRService {
         }
 
         try {
-            String cleanedText = Arrays.stream(text.split("\n"))
+            return Arrays.stream(text.split("\n"))
                         .map(String::trim)
                         .filter(line -> !line.isEmpty())
                         .map(this::cleanupLine)
                         .filter(this::isValidReceiptLine)
                         .reduce((a, b) -> a + "\n" + b)
                         .orElse("");
-            
-            // Применяем коррекцию текста
-            //return textCorrectionService.correctText(cleanedText);
-            return cleanedText;
         } catch (Exception e) {
             log.error("Error during text post-processing: {}", e.getMessage());
             return text;
