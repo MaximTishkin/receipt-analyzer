@@ -19,6 +19,7 @@ public class OCRService {
     private static final String allowedChars = "0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя.,()-:;/%₽ ";
     private static final Logger log = LoggerFactory.getLogger(OCRService.class);
     private final ImagePreprocessor imagePreprocessor;
+    private final TextCorrectionService textCorrectionService;
     private Tesseract tesseract;
     
     @Value("${tesseract.data.path}")
@@ -37,8 +38,9 @@ public class OCRService {
     private Integer confidenceThreshold;
 
     @Autowired
-    public OCRService(ImagePreprocessor imagePreprocessor) {
+    public OCRService(ImagePreprocessor imagePreprocessor, TextCorrectionService textCorrectionService) {
         this.imagePreprocessor = imagePreprocessor;
+        this.textCorrectionService = textCorrectionService;
     }
 
     @PostConstruct
@@ -113,13 +115,17 @@ public class OCRService {
         }
 
         try {
-            return Arrays.stream(text.split("\n"))
+            String cleanedText = Arrays.stream(text.split("\n"))
                         .map(String::trim)
                         .filter(line -> !line.isEmpty())
                         .map(this::cleanupLine)
                         .filter(this::isValidReceiptLine)
                         .reduce((a, b) -> a + "\n" + b)
                         .orElse("");
+            
+            // Применяем коррекцию текста
+            //return textCorrectionService.correctText(cleanedText);
+            return cleanedText;
         } catch (Exception e) {
             log.error("Error during text post-processing: {}", e.getMessage());
             return text;
