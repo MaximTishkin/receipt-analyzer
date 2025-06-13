@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @Service
 public class ReceiptDataExtractor {
-    
+
     // Паттерны для поиска даты
     private static final List<DatePattern> DATE_PATTERNS = Arrays.asList(
         new DatePattern("dd.MM.yyyy", "\\b\\d{2}\\.\\d{2}\\.\\d{4}\\b"),
@@ -24,11 +24,23 @@ public class ReceiptDataExtractor {
         new DatePattern("dd/MM/yyyy", "\\b\\d{2}/\\d{2}/\\d{4}\\b")
     );
 
-    // Паттерн для поиска суммы
-    private static final Pattern TOTAL_AMOUNT_PATTERN = Pattern.compile(
-        "(?i)(итого?|всего|к оплате|сумма|наличными)[\\s:]*?(\\d+[.,]\\d{2}|\\d+)\\D*(?:руб(?:лей)?|₽)?",
+    // Паттерн для поиска суммы после найденного ключевого слова
+    private static final Pattern AMOUNT_PATTERN = Pattern.compile(
+        "\\s*[:=]?\\s*(\\d+[.,]\\d{2})\\D*(?:руб(?:лей)?|₽)?",
         Pattern.UNICODE_CHARACTER_CLASS
     );
+
+    // Минимальная и максимальная сумма для валидации
+    private static final BigDecimal MIN_AMOUNT = new BigDecimal("1.00");
+    private static final BigDecimal MAX_AMOUNT = new BigDecimal("100000.00");
+
+    // Ключевые слова для поиска суммы
+    private static final Set<String> AMOUNT_KEYWORDS = new HashSet<>(Arrays.asList(
+        "итого", "итог", "всего", "к оплате", "сумма", "наличными", "оплата"
+    ));
+
+    // Максимальное расстояние Левенштейна для нечеткого поиска
+    private static final int MAX_LEVENSHTEIN_DISTANCE = 2;
 
     // Словари для категорий
     private static final Map<Category, Set<String>> CATEGORY_KEYWORDS = new EnumMap<>(Category.class);
@@ -64,12 +76,6 @@ public class ReceiptDataExtractor {
             return null;
         }
 
-        // Предварительная обработка текста
-        text = text.toLowerCase()
-                  .replace(",", ".")
-                  .replaceAll("\\s+", " ")
-                  .trim();
-
         return ReceiptInfo.builder()
                 .date(extractDate(text))
                 .totalAmount(extractTotalAmount(text))
@@ -94,15 +100,138 @@ public class ReceiptDataExtractor {
 
     private BigDecimal extractTotalAmount(String text) {
         try {
-            Matcher matcher = TOTAL_AMOUNT_PATTERN.matcher(text);
-            if (matcher.find()) {
-                String amount = matcher.group(2).replace(",", ".");
-                return new BigDecimal(amount);
+            // Разбиваем текст на строки для поиска
+            String[] lines = text.toLowerCase().split("\n");
+            
+            BigDecimal maxAmount = null;
+            
+            // Сначала ищем суммы после ключевых слов
+            for (String line : lines) {
+                String foundKeyword = findClosestKeyword(line);
+                if (foundKeyword != null) {
+                    int keywordIndex = line.indexOf(foundKeyword);
+                    String afterKeyword = line.substring(keywordIndex + foundKeyword.length());
+                    
+                    Matcher matcher = AMOUNT_PATTERN.matcher(afterKeyword);
+                    while (matcher.find()) {
+                        String amountStr = matcher.group(1).replace(",", ".");
+                        try {
+                            BigDecimal amount = new BigDecimal(amountStr);
+                            if (isValidAmount(amount)) {
+                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
+                                    maxAmount = amount;
+                                    log.debug("Found new max amount {} after keyword {} in line: {}", 
+                                            amount, foundKeyword, line);
+                                }
+                            }
+                        } catch (NumberFormatException e) {
+                            log.debug("Failed to parse amount: {}", amountStr);
+                        }
+                    }
+                }
             }
-        } catch (NumberFormatException e) {
+            
+            // Если не нашли сумму после ключевых слов, ищем любую подходящую сумму
+            if (maxAmount == null) {
+                Pattern anyAmount = Pattern.compile("(\\d+[.,]\\d{2})\\s*(?:руб(?:лей)?|₽)?");
+                for (String line : lines) {
+                    // Пропускаем строки с НДС и скидками
+                    if (line.contains("ндс") || line.contains("скидк")) {
+                        continue;
+                    }
+                    
+                    Matcher matcher = anyAmount.matcher(line);
+                    while (matcher.find()) {
+                        String amountStr = matcher.group(1).replace(",", ".");
+                        try {
+                            BigDecimal amount = new BigDecimal(amountStr);
+                            if (isValidAmount(amount)) {
+                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
+                                    maxAmount = amount;
+                                    log.debug("Found new max amount {} in line: {}", amount, line);
+                                }
+                            }
+                        } catch (NumberFormatException e) {
+                            log.debug("Failed to parse amount: {}", amountStr);
+                        }
+                    }
+                }
+            }
+            
+            return maxAmount;
+
+        } catch (Exception e) {
             log.error("Failed to parse total amount: {}", e.getMessage());
+            return null;
         }
-        return null;
+    }
+
+    private boolean isValidAmount(BigDecimal amount) {
+        return amount != null && 
+               amount.compareTo(MIN_AMOUNT) >= 0 && 
+               amount.compareTo(MAX_AMOUNT) <= 0;
+    }
+
+    private String findClosestKeyword(String line) {
+        String bestMatch = null;
+        int minDistance = MAX_LEVENSHTEIN_DISTANCE + 1;
+
+        // Разбиваем строку на слова
+        String[] words = line.split("\\s+");
+
+        for (String word : words) {
+            for (String keyword : AMOUNT_KEYWORDS) {
+                // Для составных ключевых слов (например, "к оплате")
+                String[] keywordParts = keyword.split("\\s+");
+                if (keywordParts.length > 1) {
+                    // Проверяем, есть ли достаточно слов для сравнения
+                    int wordIndex = Arrays.asList(words).indexOf(word);
+                    if (wordIndex + keywordParts.length <= words.length) {
+                        // Собираем фразу той же длины, что и ключевое слово
+                        String phrase = String.join(" ", Arrays.copyOfRange(words, wordIndex, wordIndex + keywordParts.length));
+                        int distance = levenshteinDistance(phrase, keyword);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMatch = keyword;
+                        }
+                    }
+                } else {
+                    // Для одиночных слов
+                    int distance = levenshteinDistance(word, keyword);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        bestMatch = keyword;
+                    }
+                }
+            }
+        }
+
+        return bestMatch;
+    }
+
+    private static int levenshteinDistance(String s1, String s2) {
+        int[] prev = new int[s2.length() + 1];
+        int[] curr = new int[s2.length() + 1];
+
+        for (int j = 0; j <= s2.length(); j++) {
+            prev[j] = j;
+        }
+
+        for (int i = 1; i <= s1.length(); i++) {
+            curr[0] = i;
+            for (int j = 1; j <= s2.length(); j++) {
+                int cost = (s1.charAt(i - 1) == s2.charAt(j - 1)) ? 0 : 1;
+                curr[j] = Math.min(Math.min(
+                    curr[j - 1] + 1,     // insertion
+                    prev[j] + 1),        // deletion
+                    prev[j - 1] + cost); // substitution
+            }
+            int[] temp = prev;
+            prev = curr;
+            curr = temp;
+        }
+
+        return prev[s2.length()];
     }
 
     private Category determineCategory(String text) {

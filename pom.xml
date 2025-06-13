@@ -18,7 +18,6 @@
         <tess4j.version>5.8.0</tess4j.version>
         <javacv.version>1.5.9</javacv.version>
         <springdoc.version>2.3.0</springdoc.version>
-        <languagetool.version>6.3</languagetool.version>
     </properties>
 
     <dependencies>
@@ -56,13 +55,6 @@
             <artifactId>lombok</artifactId>
             <version>1.18.30</version>
             <scope>provided</scope>
-        </dependency>
-
-        <!-- LanguageTool -->
-        <dependency>
-            <groupId>org.languagetool</groupId>
-            <artifactId>language-ru</artifactId>
-            <version>${languagetool.version}</version>
         </dependency>
 
         <!-- Jakarta Annotation API -->

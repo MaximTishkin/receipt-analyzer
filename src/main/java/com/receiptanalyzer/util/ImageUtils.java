@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter;
 
 public class ImageUtils {
 
-    public static BufferedImage multipartFileToBufferedImage(MultipartFile file) throws IOException {
+public static BufferedImage multipartFileToBufferedImage(MultipartFile file) throws IOException {
         return ImageIO.read(file.getInputStream());
     }
 

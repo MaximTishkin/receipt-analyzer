@@ -62,7 +62,6 @@ public class OCRService {
             // Устанавливаем режим сегментации страницы
             tesseract.setPageSegMode(pageSegMode);
 
-            
             // Настраиваем параметры для лучшего распознавания чеков
             tesseract.setTessVariable("tessedit_char_whitelist", allowedChars);
             tesseract.setTessVariable("preserve_interword_spaces", "1");
@@ -146,9 +145,6 @@ public class OCRService {
         try {
             // Удаляем множественные пробелы
             line = line.replaceAll("\\s+", " ");
-            
-            // Исправляем часто встречающиеся ошибки распознавания
-            //line = fixCommonOCRErrors(line);
             
             return line.trim();
         } catch (Exception e) {
