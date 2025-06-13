@@ -98,93 +98,111 @@ public class ReceiptDataExtractor {
         return null;
     }
 
+    /**
+     * Извлекает итоговую сумму из текста чека.
+     * Сначала ищет сумму после ключевых слов (с разделителем и без),
+     * затем ищет любую подходящую сумму по всем строкам.
+     */
     private BigDecimal extractTotalAmount(String text) {
-        try {
-            // Разбиваем текст на строки для поиска
-            String[] lines = text.toLowerCase().split("\n");
-            
-            BigDecimal maxAmount = null;
-            
-            // Сначала ищем суммы после ключевых слов
-            for (String line : lines) {
-                String foundKeyword = findClosestKeyword(line);
-                if (foundKeyword != null) {
-                    int keywordIndex = line.indexOf(foundKeyword);
-                    String afterKeyword = line.substring(keywordIndex + foundKeyword.length());
+        if (text == null || text.isEmpty()) return null;
+        String[] lines = text.toLowerCase().split("\n");
 
-                    // Ищем сумму без разделителя (например, 150000)
-                    Pattern sumNoDotPattern = Pattern.compile("\\b(\\d{5,6})(?![.,\\d])");
-                    Matcher noDotMatcher = sumNoDotPattern.matcher(afterKeyword);
-                    if (noDotMatcher.find()) {
-                        String digits = noDotMatcher.group(1);
-                        // Вставляем точку перед последними двумя цифрами
-                        String amountStr = digits.substring(0, digits.length() - 2) + "." + digits.substring(digits.length() - 2);
-                        try {
-                            BigDecimal amount = new BigDecimal(amountStr);
-                            if (isValidAmount(amount)) {
-                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
-                                    maxAmount = amount;
-                                    log.debug("[fix] Found new max amount {} after keyword {} in line: {} (fixed missing dot)", amount, foundKeyword, line);
-                                }
-                            }
-                        } catch (NumberFormatException e) {
-                            log.debug("[fix] Failed to parse fixed amount: {}", amountStr);
-                        }
-                    }
-
-                    // Ищем сумму с разделителем
-                    Matcher matcher = AMOUNT_PATTERN.matcher(afterKeyword);
-                    while (matcher.find()) {
-                        String amountStr = matcher.group(1).replace(",", ".");
-                        try {
-                            BigDecimal amount = new BigDecimal(amountStr);
-                            if (isValidAmount(amount)) {
-                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
-                                    maxAmount = amount;
-                                    log.debug("Found new max amount {} after keyword {} in line: {}", 
-                                            amount, foundKeyword, line);
-                                }
-                            }
-                        } catch (NumberFormatException e) {
-                            log.debug("Failed to parse amount: {}", amountStr);
-                        }
-                    }
-                }
+        // 1. Поиск суммы после ключевых слов — возвращаем первую найденную
+        for (String line : lines) {
+            Optional<BigDecimal> sum = findAmountAfterKeyword(line);
+            if (sum.isPresent()) {
+                return sum.get();
             }
-            
-            // Если не нашли сумму после ключевых слов, ищем любую подходящую сумму
-            if (maxAmount == null) {
-                Pattern anyAmount = Pattern.compile("(\\d+[.,]\\d{2})\\s*(?:руб(?:лей)?|₽)?");
-                for (String line : lines) {
-                    // Пропускаем строки с НДС и скидками
-                    if (line.contains("ндс") || line.contains("скидк")) {
-                        continue;
-                    }
-                    
-                    Matcher matcher = anyAmount.matcher(line);
-                    while (matcher.find()) {
-                        String amountStr = matcher.group(1).replace(",", ".");
-                        try {
-                            BigDecimal amount = new BigDecimal(amountStr);
-                            if (isValidAmount(amount)) {
-                                if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
-                                    maxAmount = amount;
-                                    log.debug("Found new max amount {} in line: {}", amount, line);
-                                }
-                            }
-                        } catch (NumberFormatException e) {
-                            log.debug("Failed to parse amount: {}", amountStr);
-                        }
-                    }
-                }
-            }
-            
-            return maxAmount;
-
-        } catch (Exception e) {
-            log.error("Failed to parse total amount: {}", e.getMessage());
-            return null;
         }
+        // 2. Если не нашли — ищем максимальную сумму по всем строкам
+        return findAnyAmount(lines);
+    }
+
+    /**
+     * Ищет сумму после ключевого слова в строке (сначала без разделителя, потом с разделителем)
+     */
+    private Optional<BigDecimal> findAmountAfterKeyword(String line) {
+        String foundKeyword = findClosestKeyword(line);
+        if (foundKeyword == null) return Optional.empty();
+        int keywordIndex = line.indexOf(foundKeyword);
+        String afterKeyword = line.substring(keywordIndex + foundKeyword.length());
+
+        // Сначала ищем сумму с разделителем (например, 1500.00)
+        Optional<BigDecimal> withDot = parseAmountWithDot(afterKeyword, line, foundKeyword);
+        if (withDot.isPresent()) return withDot;
+
+        // Затем ищем сумму без разделителя (например, 150000)
+        Optional<BigDecimal> noDot = parseAmountNoDot(afterKeyword, line, foundKeyword);
+        return noDot;
+    }
+
+    /**
+     * Ищет сумму без разделителя (например, 150000)
+     */
+    private Optional<BigDecimal> parseAmountNoDot(String afterKeyword, String line, String foundKeyword) {
+        Pattern sumNoDotPattern = Pattern.compile("\\b(\\d{5,6})(?![.,\\d])");
+        Matcher noDotMatcher = sumNoDotPattern.matcher(afterKeyword);
+        if (noDotMatcher.find()) {
+            String digits = noDotMatcher.group(1);
+            String amountStr = digits.substring(0, digits.length() - 2) + "." + digits.substring(digits.length() - 2);
+            try {
+                BigDecimal amount = new BigDecimal(amountStr);
+                if (isValidAmount(amount)) {
+                    log.debug("[fix] Found new max amount {} after keyword {} in line: {} (fixed missing dot)", amount, foundKeyword, line);
+                    return Optional.of(amount);
+                }
+            } catch (NumberFormatException e) {
+                log.debug("[fix] Failed to parse fixed amount: {}", amountStr);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Ищет сумму с разделителем (например, 1500.00)
+     */
+    private Optional<BigDecimal> parseAmountWithDot(String afterKeyword, String line, String foundKeyword) {
+        Matcher matcher = AMOUNT_PATTERN.matcher(afterKeyword);
+        while (matcher.find()) {
+            String amountStr = matcher.group(1).replace(",", ".");
+            try {
+                BigDecimal amount = new BigDecimal(amountStr);
+                if (isValidAmount(amount)) {
+                    log.debug("Found new max amount {} after keyword {} in line: {}", amount, foundKeyword, line);
+                    return Optional.of(amount);
+                }
+            } catch (NumberFormatException e) {
+                log.debug("Failed to parse amount: {}", amountStr);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Ищет любую подходящую сумму по всем строкам (если не найдено по ключевым словам)
+     */
+    private BigDecimal findAnyAmount(String[] lines) {
+        Pattern anyAmount = Pattern.compile("(\\d+[.,]\\d{2})\\s*(?:руб(?:лей)?|₽)?");
+        BigDecimal maxAmount = null;
+        for (String line : lines) {
+            if (line.contains("ндс") || line.contains("скидк")) continue;
+            Matcher matcher = anyAmount.matcher(line);
+            while (matcher.find()) {
+                String amountStr = matcher.group(1).replace(",", ".");
+                try {
+                    BigDecimal amount = new BigDecimal(amountStr);
+                    if (isValidAmount(amount)) {
+                        if (maxAmount == null || amount.compareTo(maxAmount) > 0) {
+                            maxAmount = amount;
+                            log.debug("Found new max amount {} in line: {}", amount, line);
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    log.debug("Failed to parse amount: {}", amountStr);
+                }
+            }
+        }
+        return maxAmount;
     }
 
     private boolean isValidAmount(BigDecimal amount) {
@@ -256,30 +274,24 @@ public class ReceiptDataExtractor {
     }
 
     private Category determineCategory(String text) {
-        // Создаем карту для подсчета совпадений по каждой категории
+        String lowerText = text.toLowerCase();
         Map<Category, Integer> matchCounts = new EnumMap<>(Category.class);
-        
         for (Map.Entry<Category, Set<String>> entry : CATEGORY_KEYWORDS.entrySet()) {
             Category category = entry.getKey();
             Set<String> keywords = entry.getValue();
-            
             int matches = 0;
             for (String keyword : keywords) {
-                if (text.contains(keyword)) {
+                if (lowerText.contains(keyword.toLowerCase())) {
                     matches++;
                 }
             }
-            
             if (matches > 0) {
                 matchCounts.put(category, matches);
             }
         }
-        
         if (matchCounts.isEmpty()) {
             return null;
         }
-        
-        // Возвращаем категорию с наибольшим количеством совпадений
         return Collections.max(matchCounts.entrySet(), Map.Entry.comparingByValue()).getKey();
     }
 

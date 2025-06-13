@@ -27,25 +27,38 @@ public class OcrController {
     private static final Logger log = LoggerFactory.getLogger(OcrController.class);
     private final OCRService ocrService;
 
+    /**
+     * Распознать текст на изображении и извлечь данные чека.
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Распознать текст на изображении и извлечь данные чека")
     public ReceiptInfo recognizeText(@RequestParam("file") MultipartFile file) {
+        return handleOcrRequest(() -> ocrService.processReceipt(ImageUtils.multipartFileToBufferedImage(file)));
+    }
+
+    /**
+     * Распознать текст на изображении и вернуть отладочную информацию.
+     */
+    @PostMapping(path = "/debug", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Распознать текст на изображении и вернуть отладочную информацию")
+    public ReceiptDebugInfo recognizeTextWithDebug(@RequestParam("file") MultipartFile file) {
+        return handleOcrRequest(() -> ocrService.processReceiptWithDebug(ImageUtils.multipartFileToBufferedImage(file)));
+    }
+
+    /**
+     * Унифицированная обработка ошибок для OCR endpoint'ов.
+     */
+    private <T> T handleOcrRequest(OcrSupplier<T> supplier) {
         try {
-            return ocrService.processReceipt(ImageUtils.multipartFileToBufferedImage(file));
+            return supplier.get();
         } catch (Exception e) {
             log.error("Ошибка при распознавании текста", e);
             throw new RuntimeException("Ошибка при обработке изображения: " + e.getMessage());
         }
     }
 
-    @PostMapping(path = "/debug", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Распознать текст на изображении и вернуть отладочную информацию")
-    public ReceiptDebugInfo recognizeTextWithDebug(@RequestParam("file") MultipartFile file) {
-        try {
-            return ocrService.processReceiptWithDebug(ImageUtils.multipartFileToBufferedImage(file));
-        } catch (Exception e) {
-            log.error("Ошибка при распознавании текста", e);
-            throw new RuntimeException("Ошибка при обработке изображения: " + e.getMessage());
-        }
+    @FunctionalInterface
+    private interface OcrSupplier<T> {
+        T get() throws Exception;
     }
 } 

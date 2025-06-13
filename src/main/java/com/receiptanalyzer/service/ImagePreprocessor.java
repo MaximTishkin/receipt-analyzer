@@ -66,82 +66,65 @@ public class ImagePreprocessor {
         }
     }
 
+    /**
+     * Полный цикл предобработки изображения для OCR.
+     */
     public BufferedImage preprocessImage(BufferedImage originalImage) {
-        Mat source = null;
-        Mat gray = null;
-        Mat denoised = null;
-        Mat clahe = null;
-        Mat binary = null;
-        Mat result = null;
+        Mat source = bufferedImageToMat(originalImage);
+        Mat gray = toGray(source);
+        Mat denoised = denoise(gray);
+        Mat clahe = applyClahe(denoised);
+        Mat binary = binarize(clahe);
+        Mat deskewed = deskewImage(binary);
+        Mat enhanced = enhanceReceipt(deskewed);
+        BufferedImage result = matToBufferedImage(enhanced);
+        // Освобождаем ресурсы
+        releaseAll(source, gray, denoised, clahe, binary, deskewed, enhanced);
+        return result;
+    }
 
-        try {
-            // Конвертируем BufferedImage в Mat
-            source = bufferedImageToMat(originalImage);
-            if (source == null || source.empty()) {
-                throw new IllegalStateException("Failed to convert input image to Mat");
-            }
+    private Mat toGray(Mat source) {
+        Mat gray = new Mat();
+        cvtColor(source, gray, COLOR_BGR2GRAY);
+        return gray;
+    }
 
-            // Конвертируем в оттенки серого
-            gray = new Mat();
-            cvtColor(source, gray, COLOR_BGR2GRAY);
-            if (gray.empty()) {
-                throw new IllegalStateException("Failed to convert image to grayscale");
-            }
+    private Mat denoise(Mat gray) {
+        Mat denoised = new Mat();
+        bilateralFilter(gray, denoised, 5, denoiseStrength, denoiseStrength);
+        return denoised;
+    }
 
-            // Применяем билатеральный фильтр для удаления шума с сохранением границ
-            denoised = new Mat();
-            bilateralFilter(gray, denoised, 5, denoiseStrength, denoiseStrength);
-            if (denoised.empty()) {
-                throw new IllegalStateException("Failed to apply bilateral filter");
-            }
+    private Mat applyClahe(Mat denoised) {
+        Mat clahe = new Mat();
+        CLAHE claheFilter = createCLAHE(contrastLimit, new Size(8, 8));
+        claheFilter.apply(denoised, clahe);
+        return clahe;
+    }
 
-            // Улучшаем контраст используя CLAHE
-            clahe = new Mat();
-            CLAHE claheFilter = createCLAHE(contrastLimit, new Size(8, 8));
-            claheFilter.apply(denoised, clahe);
-            if (clahe.empty()) {
-                throw new IllegalStateException("Failed to apply CLAHE");
-            }
+    private Mat binarize(Mat clahe) {
+        Mat binary = new Mat();
+        adaptiveThreshold(
+                clahe,
+                binary,
+                255,
+                ADAPTIVE_THRESH_GAUSSIAN_C,
+                THRESH_BINARY,
+                11,
+                10
+        );
+        return binary;
+    }
 
-            // Применяем адаптивную бинаризацию
-            binary = new Mat();
-            adaptiveThreshold(
-                    clahe,
-                    binary,
-                    255,
-                    ADAPTIVE_THRESH_GAUSSIAN_C,
-                    THRESH_BINARY,
-                    11,
-                    10
-            );
-            if (binary.empty()) {
-                throw new IllegalStateException("Failed to apply adaptive threshold");
-            }
-
-            // Исправляем наклон
-            result = deskewImage(binary);
-
-            // Дополнительная обработка для чеков
-            Mat enhanced = enhanceReceipt(result);
-            result.release();
-            result = enhanced;
-
-            // Конвертируем обратно в BufferedImage
-            return matToBufferedImage(result);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error during image preprocessing: " + e.getMessage(), e);
-        } finally {
-            // Освобождаем все ресурсы
-            if (source != null && !source.isNull()) source.release();
-            if (gray != null && !gray.isNull()) gray.release();
-            if (denoised != null && !denoised.isNull()) denoised.release();
-            if (clahe != null && !clahe.isNull()) clahe.release();
-            if (binary != null && !binary.isNull()) binary.release();
-            if (result != null && !result.isNull()) result.release();
+    private void releaseAll(Mat... mats) {
+        for (Mat m : mats) {
+            if (m != null && !m.isNull()) m.release();
         }
     }
 
+    /**
+     * Исправляет наклон изображения.
+     */
     private Mat deskewImage(Mat binary) {
         try {
             // Создаем копию входного изображения
@@ -223,6 +206,9 @@ public class ImagePreprocessor {
         }
     }
 
+    /**
+     * Морфологические операции для улучшения текста.
+     */
     private Mat enhanceReceipt(Mat image) {
         try {
             // Морфологические операции для улучшения текста

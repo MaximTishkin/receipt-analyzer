@@ -18,7 +18,7 @@ import java.util.Arrays;
 @Slf4j
 @Service
 public class OCRService {
-    private static final String allowedChars = "0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя.,()-:;/%₽ ";
+    private static final String ALLOWED_CHARS = "0123456789АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя.,()-:;/%₽ ";
     private static final Logger log = LoggerFactory.getLogger(OCRService.class);
     private final ImagePreprocessor imagePreprocessor;
     private final ReceiptDataExtractor dataExtractor;
@@ -49,6 +49,9 @@ public class OCRService {
         this.textCorrectionService = textCorrectionService;
     }
 
+    /**
+     * Инициализация Tesseract с нужными параметрами.
+     */
     @PostConstruct
     private void initializeTesseract() {
         this.tesseract = new Tesseract();
@@ -67,7 +70,7 @@ public class OCRService {
             tesseract.setPageSegMode(pageSegMode);
 
             // Настраиваем параметры для лучшего распознавания чеков
-            tesseract.setTessVariable("tessedit_char_whitelist", allowedChars);
+            tesseract.setTessVariable("tessedit_char_whitelist", ALLOWED_CHARS);
             tesseract.setTessVariable("preserve_interword_spaces", "1");
             tesseract.setTessVariable("textord_heavy_nr", "1");
             tesseract.setTessVariable("tessedit_write_images", "1");
@@ -87,19 +90,22 @@ public class OCRService {
         }
     }
 
+    /**
+     * Обрабатывает изображение чека с возвратом отладочной информации.
+     */
     public ReceiptDebugInfo processReceiptWithDebug(BufferedImage image) {
         try {
             log.info("Starting receipt processing with debug info");
             
             // Предварительная обработка изображения
-            BufferedImage preprocessedImage = imagePreprocessor.preprocessImage(image);
+            BufferedImage preprocessedImage = preprocessImage(image);
             log.debug("Image preprocessing completed");
 
             // Сохраняем обработанное изображение
             ImageUtils.saveImageToFile(preprocessedImage, "preprocessed");
             
             // Выполняем OCR
-            String rawText = tesseract.doOCR(preprocessedImage);
+            String rawText = doOcr(preprocessedImage);
             log.debug("OCR processing completed. Raw result: {}", rawText);
             
             // Очищаем текст
@@ -122,15 +128,32 @@ public class OCRService {
         }
     }
 
+    /**
+     * Обрабатывает изображение чека и возвращает только структурированные данные.
+     */
     public ReceiptInfo processReceipt(BufferedImage image) {
         return processReceiptWithDebug(image).getReceiptInfo();
     }
 
-    private String postProcessText(String text) {
-        if (text == null || text.isEmpty()) {
-            return "";
-        }
+    /**
+     * Предварительная обработка изображения.
+     */
+    private BufferedImage preprocessImage(BufferedImage image) {
+        return imagePreprocessor.preprocessImage(image);
+    }
 
+    /**
+     * Выполняет OCR над изображением.
+     */
+    private String doOcr(BufferedImage image) throws Exception {
+        return tesseract.doOCR(image);
+    }
+
+    /**
+     * Постобработка текста после OCR: исправление ошибок, очистка и фильтрация строк.
+     */
+    private String postProcessText(String text) {
+        if (isNullOrEmpty(text)) return "";
         try {
             // Сначала исправляем ошибки в тексте
             String correctedText = textCorrectionService.correctText(text);
@@ -149,6 +172,9 @@ public class OCRService {
         }
     }
 
+    /**
+     * Удаляет множественные пробелы в строке.
+     */
     private String cleanupLine(String line) {
         try {
             // Удаляем множественные пробелы
@@ -161,6 +187,9 @@ public class OCRService {
         }
     }
     
+    /**
+     * Проверяет, содержит ли строка полезную информацию.
+     */
     private boolean isValidReceiptLine(String line) {
         try {
             // Проверяем, содержит ли строка полезную информацию
@@ -169,5 +198,9 @@ public class OCRService {
             log.error("Error during line validation: {}", e.getMessage());
             return false;
         }
+    }
+
+    private boolean isNullOrEmpty(String text) {
+        return text == null || text.trim().isEmpty();
     }
 } 
