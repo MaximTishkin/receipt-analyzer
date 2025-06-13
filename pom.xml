@@ -63,6 +63,18 @@
             <artifactId>jakarta.annotation-api</artifactId>
             <version>2.1.1</version>
         </dependency>
+
+        <!-- Language Tool для исправления ошибок -->
+        <dependency>
+            <groupId>org.languagetool</groupId>
+            <artifactId>language-tool-core</artifactId>
+            <version>5.9</version>
+        </dependency>
+        <dependency>
+            <groupId>org.languagetool</groupId>
+            <artifactId>language-ru</artifactId>
+            <version>5.9</version>
+        </dependency>
     </dependencies>
 
     <build>

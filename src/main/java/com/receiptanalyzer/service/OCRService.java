@@ -22,6 +22,7 @@ public class OCRService {
     private static final Logger log = LoggerFactory.getLogger(OCRService.class);
     private final ImagePreprocessor imagePreprocessor;
     private final ReceiptDataExtractor dataExtractor;
+    private final TextCorrectionService textCorrectionService;
     private Tesseract tesseract;
     
     @Value("${tesseract.data.path}")
@@ -40,9 +41,12 @@ public class OCRService {
     private Integer confidenceThreshold;
 
     @Autowired
-    public OCRService(ImagePreprocessor imagePreprocessor, ReceiptDataExtractor dataExtractor) {
+    public OCRService(ImagePreprocessor imagePreprocessor, 
+                     ReceiptDataExtractor dataExtractor,
+                     TextCorrectionService textCorrectionService) {
         this.imagePreprocessor = imagePreprocessor;
         this.dataExtractor = dataExtractor;
+        this.textCorrectionService = textCorrectionService;
     }
 
     @PostConstruct
@@ -128,13 +132,17 @@ public class OCRService {
         }
 
         try {
-            return Arrays.stream(text.split("\n"))
-                        .map(String::trim)
-                        .filter(line -> !line.isEmpty())
-                        .map(this::cleanupLine)
-                        .filter(this::isValidReceiptLine)
-                        .reduce((a, b) -> a + "\n" + b)
-                        .orElse("");
+            // Сначала исправляем ошибки в тексте
+            String correctedText = textCorrectionService.correctText(text);
+            
+            // Затем применяем стандартную обработку
+            return Arrays.stream(correctedText.split("\n"))
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .map(this::cleanupLine)
+                    .filter(this::isValidReceiptLine)
+                    .reduce((a, b) -> a + "\n" + b)
+                    .orElse("");
         } catch (Exception e) {
             log.error("Error during text post-processing: {}", e.getMessage());
             return text;
