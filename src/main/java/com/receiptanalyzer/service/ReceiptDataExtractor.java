@@ -95,7 +95,8 @@ public class ReceiptDataExtractor {
                 log.debug("Failed to parse date with pattern {}: {}", pattern.format(), e.getMessage());
             }
         }
-        return null;
+        // Если дата не найдена, возвращаем текущую дату
+        return LocalDate.now();
     }
 
     /**
