@@ -15,7 +15,8 @@ public class ReceiptInfo {
     public enum Category {
         GROCERIES("продукты"),
         CLOTHING("одежда"),
-        CONSTRUCTION("стройматериалы");
+        CONSTRUCTION("стройматериалы"),
+        OTHER("другое");
 
         private final String displayName;
 

@@ -291,7 +291,7 @@ public class ReceiptDataExtractor {
             }
         }
         if (matchCounts.isEmpty()) {
-            return null;
+            return Category.OTHER;
         }
         return Collections.max(matchCounts.entrySet(), Map.Entry.comparingByValue()).getKey();
     }
