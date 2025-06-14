@@ -1,35 +1,22 @@
 package com.receiptanalyzer.service;
 
 import org.languagetool.JLanguageTool;
-import org.languagetool.language.Russian;
 import org.languagetool.rules.RuleMatch;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.PostConstruct;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class TextCorrectionService {
-    private JLanguageTool langTool;
+    private final JLanguageTool langTool;
 
-    /**
-     * Инициализация LanguageTool для русского языка с нужными правилами.
-     */
-    @PostConstruct
-    public void init() {
-        try {
-            langTool = new JLanguageTool(new Russian());
-            langTool.disableRule("UPPERCASE_SENTENCE_START");
-            langTool.disableRule("RU_COMPOUNDS");
-            langTool.enableRule("MORFOLOGIK_RULE_RU_RU");
-            langTool.enableRule("SPELLING_RULE");
-            log.info("TextCorrectionService initialized successfully");
-        } catch (Exception e) {
-            log.error("Failed to initialize TextCorrectionService: {}", e.getMessage());
-        }
+    @Autowired
+    public TextCorrectionService(JLanguageTool langTool) {
+        this.langTool = langTool;
     }
 
     /**
