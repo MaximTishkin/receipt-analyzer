@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Загрузка QR-кода чека</title>
+    <style>
+        body {
+            background: linear-gradient(120deg, #f0f4f8 0%, #cfd9df 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .centered-container {
+            background: #fff;
+            padding: 32px 40px 28px 40px;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+            min-width: 340px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h2 {
+            margin-bottom: 24px;
+            color: #2d3a4b;
+        }
+        label {
+            font-weight: 500;
+            color: #3a4a5d;
+        }
+        input[type="text"], input[type="file"] {
+            margin-top: 6px;
+            margin-bottom: 18px;
+            padding: 8px 10px;
+            border: 1px solid #bfc9d1;
+            border-radius: 6px;
+            width: 100%;
+            font-size: 1rem;
+            background: #f7fafc;
+            transition: border 0.2s;
+        }
+        input[type="text"]:focus, input[type="file"]:focus {
+            border: 1.5px solid #4f8cff;
+            outline: none;
+        }
+        button {
+            background: linear-gradient(90deg, #4f8cff 0%, #38c6ff 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 28px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(79,140,255,0.10);
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:hover {
+            background: linear-gradient(90deg, #38c6ff 0%, #4f8cff 100%);
+            transform: translateY(-2px) scale(1.03);
+        }
+        #result {
+            margin-top: 22px;
+            color: #2d3a4b;
+            font-size: 1.05rem;
+            word-break: break-all;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="centered-container">
+    <h2>Загрузка QR-кода чека</h2>
+    <form id="uploadForm">
+        <label for="clientId">ID клиента:</label>
+        <input type="text" id="clientId" name="clientId" required>
+        <label for="file">Выберите фото QR-кода с чека:</label>
+        <input type="file" id="file" name="file" accept="image/*" required>
+        <button type="submit">Распознать QR-код</button>
+    </form>
+    <div id="result"></div>
+</div>
+<script>
+    document.getElementById('uploadForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const fileInput = document.getElementById('file');
+        const clientId = document.getElementById('clientId').value;
+        if (!fileInput.files.length) {
+            alert('Пожалуйста, выберите файл!');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        // clientId можно добавить в formData, если потребуется на бэке
+        fetch('/receipt/qr', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            let resultDiv = document.getElementById('result');
+            if (!data || (!data.dateTime && !data.sum && !data.fn && !data.fiscalNumber && !data.fiscalSign && !data.docType)) {
+                resultDiv.innerText = 'QR-код не найден или не удалось распознать данные.';
+                return;
+            }
+            resultDiv.innerHTML =
+                '<b>Дата и время:</b> ' + (data.formattedDateTime || data.dateTime || '-') + '<br>' +
+                '<b>Сумма:</b> ' + (data.sum || '-') + '<br>' +
+                '<b>Фискальный накопитель (fn):</b> ' + (data.fn || '-') + '<br>' +
+                '<b>Номер чека (i):</b> ' + (data.fiscalNumber || '-') + '<br>' +
+                '<b>Фискальный признак (fp):</b> ' + (data.fiscalSign || '-') + '<br>' +
+                '<b>Тип документа (n):</b> ' + (data.docType || '-');
+        })
+        .catch(error => {
+            document.getElementById('result').innerText = 'Ошибка: ' + error;
+        });
+    });
+</script>
+</body>
+</html> 

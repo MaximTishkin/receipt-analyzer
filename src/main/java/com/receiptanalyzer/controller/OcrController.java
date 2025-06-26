@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,6 +49,25 @@ public class OcrController {
     public ResponseEntity<String> recognizeTextAsync(@RequestParam("file") MultipartFile file) {
         asyncOcrService.processAsync(file);
         return ResponseEntity.ok("Файл принят в обработку");
+    }
+
+    /**
+     * Распознать QR-код на изображении и вернуть распознанные данные.
+     */
+    @PostMapping(path = "/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Распознать QR-код на изображении и вернуть распознанные данные")
+    public ResponseEntity<OCRService.FnQrData> recognizeQr(@RequestParam("file") MultipartFile file) {
+        try {
+            String qrText = ocrService.recognizeQrCode(ImageUtils.multipartFileToBufferedImage(file));
+            if (qrText == null) {
+                return ResponseEntity.badRequest().body(null);
+            }
+            OCRService.FnQrData data = ocrService.parseFnQrString(qrText);
+            return ResponseEntity.ok(data);
+        } catch (Exception e) {
+            log.error("Ошибка при распознавании QR-кода", e);
+            return ResponseEntity.badRequest().body(null);
+        }
     }
 
     /**
