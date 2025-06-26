@@ -113,6 +113,7 @@
                 '<b>Номер чека (i):</b> ' + (data.fiscalNumber || '-') + '<br>' +
                 '<b>Фискальный признак (fp):</b> ' + (data.fiscalSign || '-') + '<br>' +
                 '<b>Тип документа (n):</b> ' + (data.docType || '-');
+                '<b>Чек успешно сохранен</b>';
         })
         .catch(error => {
             document.getElementById('result').innerText = 'Ошибка: ' + error;

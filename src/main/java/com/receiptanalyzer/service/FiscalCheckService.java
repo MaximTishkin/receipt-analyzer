@@ -1,6 +1,9 @@
 package com.receiptanalyzer.service;
 
+import com.receiptanalyzer.model.FnQrData;
+import com.receiptanalyzer.repository.FiscalCheckRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.google.zxing.*;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
@@ -13,7 +16,13 @@ import java.time.format.DateTimeParseException;
 
 @Slf4j
 @Service
-public class OCRService {
+public class FiscalCheckService {
+    private FiscalCheckRepository fiscalCheckRepository;
+
+    @Autowired
+    public FiscalCheckService(FiscalCheckRepository fiscalCheckRepository) {
+        this.fiscalCheckRepository = fiscalCheckRepository;
+    }
 
     /**
      * Распознаёт QR-код на изображении и возвращает его содержимое.
@@ -34,19 +43,6 @@ public class OCRService {
     }
 
     /**
-     * Данные, полученные из QR-кода ФНС.
-     */
-    public static class FnQrData {
-        public String dateTime;
-        public String formattedDateTime;
-        public String sum;
-        public String fn;
-        public String fiscalNumber;
-        public String fiscalSign;
-        public String docType;
-    }
-
-    /**
      * Парсит строку из QR-кода ФНС и возвращает распознанные данные.
      */
     public FnQrData parseFnQrString(String qr) {
@@ -54,24 +50,25 @@ public class OCRService {
         if (qr == null) return data;
         String[] parts = qr.split("&");
         for (String part : parts) {
-            if (part.startsWith("t=")) data.dateTime = part.substring(2);
-            else if (part.startsWith("s=")) data.sum = part.substring(2);
-            else if (part.startsWith("fn=")) data.fn = part.substring(3);
-            else if (part.startsWith("i=")) data.fiscalNumber = part.substring(2);
-            else if (part.startsWith("fp=")) data.fiscalSign = part.substring(3);
-            else if (part.startsWith("n=")) data.docType = part.substring(2);
+            if (part.startsWith("t=")) data.setDateTime(part.substring(2));
+            else if (part.startsWith("s=")) data.setSum(part.substring(2));
+            else if (part.startsWith("fn=")) data.setFn(part.substring(3));
+            else if (part.startsWith("i=")) data.setFiscalNumber(part.substring(2));
+            else if (part.startsWith("fp=")) data.setFiscalSign(part.substring(3));
+            else if (part.startsWith("n=")) data.setDocType(part.substring(2));
         }
         // Форматируем дату и время
-        if (data.dateTime != null) {
+        if (data.getDateTime() != null) {
             try {
                 DateTimeFormatter inputFmt = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm");
                 DateTimeFormatter outputFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
-                LocalDateTime dt = LocalDateTime.parse(data.dateTime, inputFmt);
-                data.formattedDateTime = dt.format(outputFmt);
+                LocalDateTime dt = LocalDateTime.parse(data.getDateTime(), inputFmt);
+                data.setFormattedDateTime(dt.format(outputFmt));
             } catch (DateTimeParseException e) {
-                data.formattedDateTime = data.dateTime;
+                data.setFormattedDateTime(data.getDateTime());
             }
         }
+        fiscalCheckRepository.saveCheckData(data);
         return data;
     }
 } 
