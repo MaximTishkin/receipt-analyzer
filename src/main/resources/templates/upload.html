@@ -99,19 +99,25 @@
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
             let resultDiv = document.getElementById('result');
-            if (!data || (!data.checkDate && !data.amount && !data.deviceRegNumber && !data.checkNumberInShift)) {
-                resultDiv.innerText = 'QR-код не найден или не удалось распознать данные.';
-                return;
+            if (response.ok) {
+                const data = await response.json();
+                if (!data || (!data.checkDate && !data.amount && !data.deviceRegNumber && !data.checkNumberInShift)) {
+                    resultDiv.innerText = 'QR-код не найден или не удалось распознать данные.';
+                    return;
+                }
+                resultDiv.innerHTML =
+                    '<b>Дата и время:</b> ' + (data.checkDate || '-') + '<br>' +
+                    '<b>Сумма:</b> ' + (data.amount || '-') + '<br>' +
+                    '<b>Фискальный накопитель (fn):</b> ' + (data.deviceRegNumber || '-') + '<br>' +
+                    '<b>Номер чека (i):</b> ' + (data.checkNumberInShift || '-') + '<br>' +
+                    '<b>Чек успешно сохранен</b>';
+            } else {
+                // Ошибка: выводим только текст из exception
+                const text = await response.text();
+                resultDiv.innerText = text ? ('Ошибка: ' + text) : 'Произошла ошибка при загрузке.';
             }
-            resultDiv.innerHTML =
-                '<b>Дата и время:</b> ' + (data.checkDate || '-') + '<br>' +
-                '<b>Сумма:</b> ' + (data.amount || '-') + '<br>' +
-                '<b>Фискальный накопитель (fn):</b> ' + (data.deviceRegNumber || '-') + '<br>' +
-                '<b>Номер чека (i):</b> ' + (data.checkNumberInShift || '-') + '<br>' +
-                '<b>Чек успешно сохранен</b>';
         })
         .catch(error => {
             document.getElementById('result').innerText = 'Ошибка: ' + error;

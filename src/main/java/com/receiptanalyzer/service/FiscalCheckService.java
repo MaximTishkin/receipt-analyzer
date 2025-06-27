@@ -46,7 +46,7 @@ public class FiscalCheckService {
             throw new ServiceException(errorMessage);
         } catch (Exception e) {
             String errorMessage = "Ошибка при распознавании QR-кода";
-            log.error(errorMessage + e.getMessage(), e);
+            log.error(errorMessage + ": " + e.getMessage(), e);
             throw new ServiceException(errorMessage);
         }
     }
