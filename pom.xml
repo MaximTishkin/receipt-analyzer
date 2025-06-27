@@ -38,6 +38,12 @@
             <version>${spring.boot.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.6.0</version>
+        </dependency>
+
         <!-- OpenAPI (Swagger) -->
         <dependency>
             <groupId>org.springdoc</groupId>

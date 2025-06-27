@@ -102,17 +102,15 @@
         .then(response => response.json())
         .then(data => {
             let resultDiv = document.getElementById('result');
-            if (!data || (!data.dateTime && !data.sum && !data.fn && !data.fiscalNumber && !data.fiscalSign && !data.docType)) {
+            if (!data || (!data.checkDate && !data.amount && !data.deviceRegNumber && !data.checkNumberInShift)) {
                 resultDiv.innerText = 'QR-код не найден или не удалось распознать данные.';
                 return;
             }
             resultDiv.innerHTML =
-                '<b>Дата и время:</b> ' + (data.formattedDateTime || data.dateTime || '-') + '<br>' +
-                '<b>Сумма:</b> ' + (data.sum || '-') + '<br>' +
-                '<b>Фискальный накопитель (fn):</b> ' + (data.fn || '-') + '<br>' +
-                '<b>Номер чека (i):</b> ' + (data.fiscalNumber || '-') + '<br>' +
-                '<b>Фискальный признак (fp):</b> ' + (data.fiscalSign || '-') + '<br>' +
-                '<b>Тип документа (n):</b> ' + (data.docType || '-');
+                '<b>Дата и время:</b> ' + (data.checkDate || '-') + '<br>' +
+                '<b>Сумма:</b> ' + (data.amount || '-') + '<br>' +
+                '<b>Фискальный накопитель (fn):</b> ' + (data.deviceRegNumber || '-') + '<br>' +
+                '<b>Номер чека (i):</b> ' + (data.checkNumberInShift || '-') + '<br>' +
                 '<b>Чек успешно сохранен</b>';
         })
         .catch(error => {
