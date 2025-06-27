@@ -2,8 +2,9 @@ package com.receiptanalyzer.service;
 
 import com.receiptanalyzer.exception.RepositoryException;
 import com.receiptanalyzer.exception.ServiceException;
-import com.receiptanalyzer.model.FiscalCheckData;
-import com.receiptanalyzer.repository.FiscalCheckRepository;
+import com.receiptanalyzer.generator.ReceiptDataGenerator;
+import com.receiptanalyzer.model.ReceiptData;
+import com.receiptanalyzer.repository.ReceiptRepository;
 import com.receiptanalyzer.util.ImageUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,21 +20,51 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Сервис для работы с чеками.
+ */
 @Slf4j
 @Service
-public class FiscalCheckService {
+public class ReceiptService {
     private static final DateTimeFormatter inputFmt = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm");
-    private final FiscalCheckRepository fiscalCheckRepository;
+    private final ReceiptRepository receiptRepository;
+    private final ReceiptDataGenerator receiptDataGenerator;
 
     @Autowired
-    public FiscalCheckService(FiscalCheckRepository fiscalCheckRepository) {
-        this.fiscalCheckRepository = fiscalCheckRepository;
+    public ReceiptService(ReceiptRepository receiptRepository, ReceiptDataGenerator receiptDataGenerator) {
+        this.receiptRepository = receiptRepository;
+        this.receiptDataGenerator = receiptDataGenerator;
     }
 
     /**
-     * Распознаёт QR-код на изображении и возвращает его содержимое.
+     * Заполняет данные чека по QR + генерация покупок/категорий.
+     *
+     * @param file файл с QR кодом
+     * @param clientId id клиента
+     * @return данные по чеку
      */
-    public String recognizeQrCode(MultipartFile file) {
+    public ReceiptData getDataByQr(MultipartFile file, Long clientId) {
+        String qrText = recognizeQrCode(file);
+        ReceiptData data = parseFnQrString(qrText, clientId);
+        receiptDataGenerator.fillReceiptData(data);
+        return data;
+    }
+
+    /**
+     * Сохраняет данные чека.
+     *
+     * @param data данные по чеку
+     */
+    public void saveReceiptData(ReceiptData data) {
+        try {
+            receiptRepository.saveReceiptData(data);
+        } catch (RepositoryException e) {
+            log.error(e.getMessage(), e);
+            throw new ServiceException(e.getMessage());
+        }
+    }
+
+    private String recognizeQrCode(MultipartFile file) {
         try {
             BufferedImage image = ImageUtils.multipartFileToBufferedImage(file);
             LuminanceSource source = new BufferedImageLuminanceSource(image);
@@ -51,11 +82,8 @@ public class FiscalCheckService {
         }
     }
 
-    /**
-     * Парсит строку из QR-кода ФНС и возвращает распознанные данные.
-     */
-    public FiscalCheckData parseFnQrString(String qr, Long clientId) {
-        FiscalCheckData data = new FiscalCheckData();
+    private ReceiptData parseFnQrString(String qr, Long clientId) {
+        ReceiptData data = new ReceiptData();
         data.setClientId(clientId);
         String[] parts = qr.split("&");
         for (String part : parts) {
@@ -86,15 +114,5 @@ public class FiscalCheckService {
         // Номер смены поке генерится рандомный, этой информации нет в QR
         data.setShiftNumber(ThreadLocalRandom.current().nextLong(1L, 201L));
         return data;
-    }
-
-    public void saveCheckData(FiscalCheckData data) {
-        try {
-            fiscalCheckRepository.saveCheckData(data);
-        } catch (RepositoryException e) {
-            log.error(e.getMessage(), e);
-            throw new ServiceException(e.getMessage());
-        }
-
     }
 } 

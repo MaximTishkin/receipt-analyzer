@@ -1,5 +1,10 @@
 package com.receiptanalyzer.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@AllArgsConstructor
+@Data
 public class CategoryStats {
     private Double totalAmount;
     private Integer count;

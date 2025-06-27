@@ -1,17 +1,20 @@
 package com.receiptanalyzer.model;
 
+import lombok.Data;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-public class FiscalCheckData {
+@Data
+public class ReceiptData {
     private Long clientId;
     private LocalDateTime checkDate;
     private Double amount;
     private String deviceRegNumber;
     private Long shiftNumber;
     private Long checkNumberInShift;
-    private List<CheckItem> items;
+    private List<ReceiptItem> items;
     private Map<String, CategoryStats> categories;
 
     // Геттеры и сеттеры
@@ -63,11 +66,11 @@ public class FiscalCheckData {
         this.checkNumberInShift = checkNumberInShift;
     }
 
-    public List<CheckItem> getItems() {
+    public List<ReceiptItem> getItems() {
         return items;
     }
 
-    public void setItems(List<CheckItem> items) {
+    public void setItems(List<ReceiptItem> items) {
         this.items = items;
     }
 

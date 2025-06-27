@@ -3,7 +3,7 @@ package com.receiptanalyzer.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.receiptanalyzer.exception.RepositoryException;
-import com.receiptanalyzer.model.FiscalCheckData;
+import com.receiptanalyzer.model.ReceiptData;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,8 +12,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @Slf4j
-public class FiscalCheckRepository {
-    private static final String SAVE_CHECK_DATA_SQL = "CALL fiscal_data.save_check_data(?, ?::timestamp without time zone, ?::numeric, ?, ?, ?, ?::jsonb, ?::jsonb)";
+public class ReceiptRepository {
+    private static final String SAVE_RECEIPT_DATA_SQL = "CALL fiscal_data.save_check_data(?, ?::timestamp without time zone, ?::numeric, ?, ?, ?, ?::jsonb, ?::jsonb)";
 
     private final JdbcTemplate jdbcTemplate;
     private ObjectMapper mapper;
@@ -24,21 +24,22 @@ public class FiscalCheckRepository {
     }
 
     @Autowired
-    public FiscalCheckRepository(JdbcTemplate jdbcTemplate) {
+    public ReceiptRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void saveCheckData(FiscalCheckData checkData) throws RepositoryException {
+    public void saveReceiptData(ReceiptData receiptData) throws RepositoryException {
+        log.info("Сохранение чека: " + receiptData);
         try {
-            jdbcTemplate.update(SAVE_CHECK_DATA_SQL,
-                    checkData.getClientId() != null ? checkData.getClientId() : 0,
-                    checkData.getCheckDate(),
-                    checkData.getAmount(),
-                    checkData.getDeviceRegNumber(),
-                    checkData.getShiftNumber(),
-                    checkData.getCheckNumberInShift(),
-                    checkData.getItems() != null ? toJson(checkData.getItems()) : "{}",
-                    checkData.getCategories() != null ? toJson(checkData.getCategories()) : "{}"
+            jdbcTemplate.update(SAVE_RECEIPT_DATA_SQL,
+                    receiptData.getClientId(),
+                    receiptData.getCheckDate(),
+                    receiptData.getAmount(),
+                    receiptData.getDeviceRegNumber(),
+                    receiptData.getShiftNumber(),
+                    receiptData.getCheckNumberInShift(),
+                    receiptData.getItems() != null ? toJson(receiptData.getItems()) : "{}",
+                    receiptData.getCategories() != null ? toJson(receiptData.getCategories()) : "{}"
             );
         } catch (Exception e) {
             throw new RepositoryException("Ошибка при сохранении данных чека", e);

@@ -1,6 +1,11 @@
 package com.receiptanalyzer.model;
 
-public class CheckItem {
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@AllArgsConstructor
+@Data
+public class ReceiptItem {
     private String name;
     private Double price;
     private Integer quantity;
