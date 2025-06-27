@@ -94,7 +94,7 @@
         }
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
-        // clientId можно добавить в formData, если потребуется на бэке
+        formData.append('clientId', clientId);
         fetch('/receipt/qr', {
             method: 'POST',
             body: formData

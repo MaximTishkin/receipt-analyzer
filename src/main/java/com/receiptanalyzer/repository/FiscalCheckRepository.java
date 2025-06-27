@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 @Slf4j
 public class FiscalCheckRepository {
+    private static final String SAVE_CHECK_DATA_SQL = "CALL fiscal_data.save_check_data(?, ?::timestamp without time zone, ?::numeric, ?, ?, ?, ?::jsonb, ?::jsonb)";
+
     private final JdbcTemplate jdbcTemplate;
     private ObjectMapper mapper;
 
@@ -27,10 +29,8 @@ public class FiscalCheckRepository {
     }
 
     public void saveCheckData(FiscalCheckData checkData) throws RepositoryException {
-        String sql = "CALL fiscal_data.save_check_data(?, ?::timestamp without time zone, ?::numeric, ?, ?, ?, ?::jsonb, ?::jsonb)";
-
         try {
-            jdbcTemplate.update(sql,
+            jdbcTemplate.update(SAVE_CHECK_DATA_SQL,
                     checkData.getClientId() != null ? checkData.getClientId() : 0,
                     checkData.getCheckDate(),
                     checkData.getAmount(),
@@ -41,7 +41,6 @@ public class FiscalCheckRepository {
                     checkData.getCategories() != null ? toJson(checkData.getCategories()) : "{}"
             );
         } catch (Exception e) {
-            log.error("Ошибка при сохранении данных чека", e.getMessage());
             throw new RepositoryException("Ошибка при сохранении данных чека", e);
         }
     }

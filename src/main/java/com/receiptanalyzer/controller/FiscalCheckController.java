@@ -32,17 +32,11 @@ public class FiscalCheckController {
      */
     @PostMapping(path = "/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Распознать QR-код на изображении, сохранить значения в БД")
-    public ResponseEntity<FiscalCheckData> recognizeQr(@RequestParam("file") MultipartFile file) {
-        try {
-            String qrText = fiscalCheckService.recognizeQrCode(ImageUtils.multipartFileToBufferedImage(file));
-            if (qrText == null) {
-                return ResponseEntity.badRequest().body(null);
-            }
-            FiscalCheckData data = fiscalCheckService.parseFnQrString(qrText);
-            return ResponseEntity.ok(data);
-        } catch (Exception e) {
-            log.error("Ошибка при распознавании QR-кода", e);
-            return ResponseEntity.badRequest().body(null);
-        }
+    public ResponseEntity<FiscalCheckData> recognizeQr(@RequestParam("file") MultipartFile file, @RequestParam("clientId") Long clientId) {
+        String qrText = fiscalCheckService.recognizeQrCode(file);
+        FiscalCheckData data = fiscalCheckService.parseFnQrString(qrText, clientId);
+        fiscalCheckService.saveCheckData(data);
+
+        return ResponseEntity.ok(data);
     }
 } 
